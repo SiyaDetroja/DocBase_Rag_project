@@ -8,12 +8,14 @@
 </head>
 <body>
   <div class="app-shell">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <aside class="sidebar">
       <div class="brand">
         <div>
           <p class="brand-kicker">DocBase AI Workspace</p>
           <h1>Chats</h1>
         </div>
+        <button class="icon-btn sidebar-close-btn" id="sidebarCloseBtn" type="button" aria-label="Close chat menu">Close</button>
       </div>
 
       <button class="new-chat-btn" id="newChatBtn" type="button">+ New Chat</button>
@@ -32,6 +34,7 @@
 
     <main class="chat-layout">
       <header class="chat-header">
+        <button class="icon-btn mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open chat menu">Menu</button>
         <div>
           <p class="section-title">Assistant</p>
           <h2 id="chatTitle">New Chat</h2>

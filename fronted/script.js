@@ -24,6 +24,9 @@ const quickActions = document.getElementById("quickActions");
 const deleteModal = document.getElementById("deleteModal");
 const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
 const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+const sidebarCloseBtn = document.getElementById("sidebarCloseBtn");
+const sidebarBackdrop = document.getElementById("sidebarBackdrop");
 let historyRetryTimer = null;
 let pendingDeleteChatId = null;
 
@@ -244,6 +247,20 @@ function clearChatSessionState() {
   sessionStorage.removeItem("activeChatId");
 }
 
+function openSidebar() {
+  document.body.classList.add("mobile-sidebar-open");
+}
+
+function closeSidebar() {
+  document.body.classList.remove("mobile-sidebar-open");
+}
+
+function syncSidebarState() {
+  if (window.innerWidth > 980) {
+    closeSidebar();
+  }
+}
+
 function restoreActiveChatState() {
   const savedChatId = sessionStorage.getItem("activeChatId");
   if (!savedChatId) {
@@ -322,6 +339,9 @@ function openChat(chatId) {
   renderChats();
   const chat = getActiveChat();
   updateChatView(chat);
+  if (window.innerWidth <= 980) {
+    closeSidebar();
+  }
 }
 
 async function newChat() {
@@ -521,6 +541,15 @@ document.getElementById("newChatBtn").addEventListener("click", newChat);
 document.getElementById("logoutBtn").addEventListener("click", logout);
 document.getElementById("composerUploadBtn").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", uploadSelectedFile);
+if (mobileMenuBtn) {
+  mobileMenuBtn.addEventListener("click", openSidebar);
+}
+if (sidebarCloseBtn) {
+  sidebarCloseBtn.addEventListener("click", closeSidebar);
+}
+if (sidebarBackdrop) {
+  sidebarBackdrop.addEventListener("click", closeSidebar);
+}
 confirmDeleteBtn.addEventListener("click", async () => {
   if (pendingDeleteChatId == null) {
     closeDeleteModal();
@@ -552,10 +581,18 @@ messageInput.addEventListener("keydown", (event) => {
     sendMessage();
   }
 });
+window.addEventListener("resize", syncSidebarState);
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeSidebar();
+    closeDeleteModal();
+  }
+});
 
 syncUserBadge();
 autoResizeTextarea();
 restoreActiveChatState();
+syncSidebarState();
 fetchHistory().catch(() => {
   clearSystemBanners();
   showBanner("Backend is restarting or temporarily unavailable. Retrying...");

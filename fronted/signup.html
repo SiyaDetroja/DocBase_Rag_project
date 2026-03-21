@@ -25,7 +25,8 @@
 
     body {
       margin: 0;
-      height: 100vh;
+      min-height: 100vh;
+      min-height: 100dvh;
       display: grid;
       place-items: center;
       padding: 16px;
@@ -35,12 +36,14 @@
         var(--bg);
       color: var(--text);
       font-family: "Manrope", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: auto;
     }
 
     .auth-shell {
       width: min(920px, 100%);
-      height: min(540px, calc(100vh - 32px));
+      min-height: min(540px, calc(100vh - 32px));
+      min-height: min(540px, calc(100dvh - 32px));
       display: grid;
       grid-template-columns: 1.02fr 1fr;
       border: 2px solid var(--border);
@@ -219,9 +222,13 @@
     }
 
     @media (max-width: 860px) {
+      body {
+        display: grid;
+      }
+
       .auth-shell {
         grid-template-columns: 1fr;
-        height: min(680px, calc(100vh - 24px));
+        min-height: auto;
       }
 
       .visual-side {
@@ -234,6 +241,48 @@
         padding: 20px 20px 24px;
       }
     }
+
+    @media (max-width: 540px) {
+      body {
+        padding: 10px;
+      }
+
+      .auth-shell {
+        border-width: 1px;
+      }
+
+      .visual-side {
+        min-height: 120px;
+        padding: 18px 16px;
+      }
+
+      .visual-copy {
+        max-width: none;
+      }
+
+      .visual-copy h1 {
+        font-size: clamp(1.55rem, 8vw, 2.2rem);
+      }
+
+      .visual-copy p {
+        font-size: 0.88rem;
+      }
+
+      .form-side {
+        padding: 18px 14px 20px;
+      }
+
+      .form-card h2 {
+        font-size: 1.8rem;
+        margin-bottom: 16px;
+      }
+
+      .primary-btn,
+      .password-toggle {
+        min-height: 44px;
+      }
+    }
+
   </style>
 </head>
 <body>
