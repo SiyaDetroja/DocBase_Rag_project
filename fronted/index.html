@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocBase AI Workspace</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div>
+          <p class="brand-kicker">DocBase AI Workspace</p>
+          <h1>Chats</h1>
+        </div>
+      </div>
+
+      <button class="new-chat-btn" id="newChatBtn" type="button">+ New Chat</button>
+      <input id="fileInput" type="file" hidden accept=".pdf,.docx,.txt">
+      <p id="uploadStatus" class="upload-status sidebar-upload-status"></p>
+
+      <div class="chat-list-wrap">
+        <div class="section-title">Recent Chats</div>
+        <div id="chatList" class="chat-list"></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="ghost-btn" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </aside>
+
+    <main class="chat-layout">
+      <header class="chat-header">
+        <div>
+          <p class="section-title">Assistant</p>
+          <h2 id="chatTitle">New Chat</h2>
+        </div>
+        <div class="status-pill" id="userBadge">Authenticated</div>
+      </header>
+
+      <section id="chatBox" class="chat-box">
+        <div class="empty-state" id="emptyState">
+          <p class="empty-eyebrow">RAG Assistant</p>
+          <h3>Where should we begin?</h3>
+          <p>Upload documents, start a new conversation, and ask anything from your private knowledge base.</p>
+        </div>
+      </section>
+
+      <div class="composer">
+        <button class="icon-btn" id="composerUploadBtn" type="button">+</button>
+        <textarea id="messageInput" rows="1" placeholder="Message your RAG assistant"></textarea>
+        <button class="send-btn" id="sendBtn" type="button">Send</button>
+      </div>
+
+      <div class="quick-actions" id="quickActions">
+        <button class="quick-action-btn" type="button" data-prompt="Summarize the main ideas from my uploaded documents.">Summarize docs</button>
+        <button class="quick-action-btn" type="button" data-prompt="List the key topics covered in my uploaded files.">Key topics</button>
+        <button class="quick-action-btn" type="button" data-prompt="Explain the important points in simple words.">Explain simply</button>
+      </div>
+
+      <p class="footer-note">DocBase AI can make mistakes. Check important information.</p>
+    </main>
+  </div>
+
+  <div class="modal-backdrop hidden" id="deleteModal">
+    <div class="modal-card">
+      <h3>Delete Chat?</h3>
+      <p>Do you want to confirm deleting this chat?</p>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-secondary" id="cancelDeleteBtn" type="button">Cancel</button>
+        <button class="modal-btn modal-btn-danger" id="confirmDeleteBtn" type="button">Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

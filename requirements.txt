@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+pydantic[email]
+langchain
+langchain-community
+langchain-openai
+langchain-groq
+faiss-cpu
+fastembed
+pypdf
+docx2txt
+python-dotenv

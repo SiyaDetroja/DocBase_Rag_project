@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | DocBase AI</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+    :root {
+      --bg: #08040f;
+      --panel: #0b0614;
+      --border: #7b2dff;
+      --border-soft: rgba(164, 88, 255, 0.38);
+      --text: #ffffff;
+      --muted: #cdb9f6;
+      --line: rgba(255, 255, 255, 0.68);
+      --glow: 0 0 34px rgba(122, 45, 255, 0.45);
+      --button-top: #a84dff;
+      --button-bottom: #6f20ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background:
+        radial-gradient(circle at top center, rgba(123, 45, 255, 0.16), transparent 30%),
+        radial-gradient(circle at bottom left, rgba(123, 45, 255, 0.12), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      font-family: "Manrope", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+    }
+
+    .auth-shell {
+      width: min(920px, 100%);
+      height: min(540px, calc(100vh - 32px));
+      display: grid;
+      grid-template-columns: 1.02fr 1fr;
+      border: 2px solid var(--border);
+      background: #08030f;
+      box-shadow: var(--glow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .auth-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      box-shadow: inset 0 0 26px rgba(123, 45, 255, 0.24);
+      pointer-events: none;
+    }
+
+    .visual-side {
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 36px 32px;
+      background: linear-gradient(145deg, #6f20ff 0%, #36115d 58%, #231032 100%);
+      clip-path: polygon(0 0, 88% 0, 54% 100%, 0 100%);
+    }
+
+    .visual-copy {
+      max-width: 220px;
+    }
+
+    .visual-copy h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.9rem, 3.4vw, 3.1rem);
+      line-height: 0.95;
+      text-transform: uppercase;
+    }
+
+    .visual-copy p {
+      margin: 0;
+      color: #eddfff;
+      line-height: 1.55;
+      font-size: 0.92rem;
+    }
+
+    .form-side {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 30px 28px 18px;
+      background: rgba(7, 4, 12, 0.96);
+    }
+
+    .form-card {
+      width: min(360px, 100%);
+    }
+
+    .form-card h2 {
+      margin: 0 0 18px;
+      font-size: 2.2rem;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 8px;
+      color: #f9f1ff;
+      font-size: 0.95rem;
+    }
+
+    .input-wrap {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 2px solid var(--line);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 6px 0 10px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      outline: 0;
+      font-size: 0.98rem;
+    }
+
+    .input-wrap:focus-within {
+      border-color: #bf85ff;
+      box-shadow: 0 8px 18px -14px rgba(191, 133, 255, 0.9);
+    }
+
+    .field input.is-invalid,
+    .field .input-wrap:has(input.is-invalid) {
+      border-color: #ff7c9d;
+      box-shadow: 0 8px 18px -14px rgba(255, 124, 157, 0.72);
+    }
+
+    .field input::placeholder {
+      color: rgba(220, 197, 255, 0.54);
+    }
+
+    .password-toggle,
+    .text-link {
+      border: 0;
+      background: transparent;
+      color: #cfa7ff;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .password-toggle {
+      padding: 6px 0 10px;
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    .field-error {
+      min-height: 14px;
+      margin-top: 4px;
+      color: #ff93ae;
+      font-size: 0.75rem;
+      line-height: 1.3;
+    }
+
+    .form-message {
+      min-height: 18px;
+      margin: -2px 0 8px;
+      font-size: 0.82rem;
+      line-height: 1.35;
+      color: #ff93ae;
+    }
+
+    .form-message.success {
+      color: #9ef0b7;
+    }
+
+    .aux-row {
+      display: flex;
+      justify-content: flex-end;
+      margin: -2px 0 8px;
+    }
+
+    .text-link {
+      padding: 0;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .text-link:hover {
+      color: #e2c4ff;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .primary-btn {
+      width: 100%;
+      margin-top: 6px;
+      padding: 13px 18px;
+      border: 1px solid rgba(190, 133, 255, 0.74);
+      border-radius: 999px;
+      background: linear-gradient(180deg, var(--button-top), var(--button-bottom));
+      color: white;
+      font-size: 0.96rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(111, 32, 255, 0.42);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 26px rgba(111, 32, 255, 0.52);
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.72;
+      cursor: wait;
+    }
+
+    .switch-text {
+      margin: 14px 0 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .switch-text a {
+      color: #a84dff;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    @media (max-width: 860px) {
+      .auth-shell {
+        grid-template-columns: 1fr;
+        height: min(680px, calc(100vh - 24px));
+      }
+
+      .visual-side {
+        min-height: 150px;
+        clip-path: none;
+        padding: 24px 22px;
+      }
+
+      .form-side {
+        padding: 20px 20px 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="auth-shell">
+    <section class="visual-side">
+      <div class="visual-copy">
+        <h1>Welcome<br>Back!</h1>
+        <p>Log in to continue with DocBase.
+        Your AI-powered document assistant is ready to help you find answers instantly.</p>
+      </div>
+    </section>
+
+    <section class="form-side">
+      <div class="form-card">
+        <div id="loginPanel">
+          <h2>Login</h2>
+
+          <div class="field">
+            <label for="identifier">Username or Email</label>
+            <div class="input-wrap">
+              <input id="identifier" type="text" placeholder="Enter username or email" autocomplete="username" onkeydown="handleAuthEnter(event, login)">
+            </div>
+            <div id="identifierError" class="field-error"></div>
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="input-wrap">
+              <input id="password" type="password" placeholder="Enter password" autocomplete="current-password" onkeydown="handleAuthEnter(event, login)">
+              <button class="password-toggle" type="button" data-target="password" aria-label="Show password">Show</button>
+            </div>
+            <div id="passwordError" class="field-error"></div>
+          </div>
+
+          <div class="aux-row">
+            <button class="text-link" type="button" onclick="showResetForm()">Forgot password?</button>
+          </div>
+
+          <div id="loginMessage" class="form-message" aria-live="polite"></div>
+          <button id="loginButton" class="primary-btn" type="button" onclick="login()">Login</button>
+          <p class="switch-text">Don't have an account? <a href="signup.html">Sign Up</a></p>
+        </div>
+
+        <div id="resetPanel" class="hidden">
+          <h2>Reset Password</h2>
+
+          <div class="field">
+            <label for="resetIdentifier">Username or Email</label>
+            <div class="input-wrap">
+              <input id="resetIdentifier" type="text" placeholder="Enter username or email" autocomplete="username email" onkeydown="handleAuthEnter(event, resetPassword)">
+            </div>
+            <div id="resetIdentifierError" class="field-error"></div>
+          </div>
+
+          <form id="resetPasswordForm" onsubmit="event.preventDefault(); resetPassword();">
+            <div class="field">
+              <label for="resetPassword">New Password</label>
+              <div class="input-wrap">
+                <input id="resetPassword" type="password" placeholder="Enter new password" autocomplete="new-password">
+                <button class="password-toggle" type="button" data-target="resetPassword" aria-label="Show password">Show</button>
+              </div>
+              <div id="resetPasswordError" class="field-error"></div>
+            </div>
+
+            <div class="field">
+              <label for="resetConfirmPassword">Confirm Password</label>
+              <div class="input-wrap">
+                <input id="resetConfirmPassword" type="password" placeholder="Confirm new password" autocomplete="new-password" onkeydown="handleAuthEnter(event, resetPassword)">
+                <button class="password-toggle" type="button" data-target="resetConfirmPassword" aria-label="Show password">Show</button>
+              </div>
+              <div id="resetConfirmPasswordError" class="field-error"></div>
+            </div>
+          </form>
+
+          <div id="resetMessage" class="form-message" aria-live="polite"></div>
+          <button id="resetButton" class="primary-btn" type="button" onclick="resetPassword()">Reset Password</button>
+          <p class="switch-text">Remembered it? <button class="text-link" type="button" onclick="showLoginForm()">Back to Login</button></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="auth.js"></script>
+</body>
+</html>
