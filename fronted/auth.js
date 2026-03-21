@@ -1,4 +1,4 @@
-const API = "https://docbase-hhxp.onrender.com/";
+const API = "https://docbase-hhxp.onrender.com";
 
 function getValue(id) {
   const element = document.getElementById(id);
