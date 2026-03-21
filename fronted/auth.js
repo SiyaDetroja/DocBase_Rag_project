@@ -248,7 +248,7 @@ async function signup() {
   } catch (error) {
     setFormMessage(
       "signupMessage",
-      "Could not connect to the backend. Make sure FastAPI is running on http://127.0.0.1:8000."
+      "Could not connect to the server. Please try again."
     );
   } finally {
     setButtonState("signupButton", "Creating...", false);
@@ -285,7 +285,7 @@ async function login() {
   } catch (error) {
     setFormMessage(
       "loginMessage",
-      "Could not connect to the backend. Make sure FastAPI is running on http://127.0.0.1:8000."
+      "Could not connect to the server. Please try again."
     );
   } finally {
     setButtonState("loginButton", "Logging in...", false);
@@ -325,7 +325,7 @@ async function resetPassword() {
   } catch (error) {
     setFormMessage(
       "resetMessage",
-      "Could not connect to the backend. Make sure FastAPI is running on http://127.0.0.1:8000."
+      "Could not connect to the server. Please try again."
     );
   } finally {
     setButtonState("resetButton", "Resetting...", false);
