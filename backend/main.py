@@ -31,9 +31,12 @@ app = FastAPI(title="RAG Web App")
 
 app.add_middleware(
     CORSMiddleware,
-   allow_origins=[
-    "https://docbaseragapp.vercel.app"
- ],
+    allow_origins=[
+        "https://docbaseragapp.vercel.app",
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -120,6 +123,9 @@ def _serialize_chat(chat: Chat):
         "messages": [_serialize_message(message) for message in chat.messages],
     }
 
+@app.get("/")
+def root():
+    return {"message": "API is running 🚀"}
 
 @app.post("/signup", status_code=status.HTTP_201_CREATED)
 def signup(payload: SignupInput, db: Session = Depends(get_db)):
