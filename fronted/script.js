@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8000";
+const API = "https://docbase-hhxp.onrender.com";
 
 const token = localStorage.getItem("token");
 if (!token) {
@@ -598,6 +598,6 @@ fetchHistory().catch(() => {
   showBanner("Backend is restarting or temporarily unavailable. Retrying...");
   clearTimeout(historyRetryTimer);
   historyRetryTimer = setTimeout(() => {
-    fetchHistory().catch(() => {});
+    fetchHistory().catch(() => { });
   }, 1500);
 });
