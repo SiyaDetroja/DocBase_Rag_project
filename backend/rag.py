@@ -185,7 +185,7 @@ def get_answer(user_id: int, chat_id: int, query: str, history: Iterable[dict]):
     context = ""
 
     if vectorstore is not None:
-        # Retrieval converts the question into an embedding and fetches relevant chunks.
+        # Retrieval converts the question into an embedding and es relevant chunks.
         scored_docs = vectorstore.similarity_search_with_score(query, k=5)
         retrieved_docs = [doc for doc, _score in scored_docs]
         scores = [score for _doc, score in scored_docs]
