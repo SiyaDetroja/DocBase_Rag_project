@@ -349,6 +349,11 @@ body {
   box-shadow: none;
 }
 
+.document-chip-uploading {
+  border-color: rgba(168, 77, 255, 0.38);
+  background: rgba(168, 77, 255, 0.08);
+}
+
 .document-chip-badge {
   width: 42px;
   height: 42px;
@@ -379,6 +384,30 @@ body {
   margin: 2px 0 0;
   font-size: 0.8rem;
   color: #f0deff;
+}
+
+.document-loader {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 12px;
+}
+
+.document-loader-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e3c8ff;
+  animation: pulse 1s infinite ease-in-out;
+}
+
+.document-loader-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.document-loader-dot:nth-child(3) {
+  animation-delay: 0.3s;
 }
 
 .message-bubble {

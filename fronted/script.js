@@ -167,6 +167,37 @@ function appendDocument(uploadedDoc) {
 
   chatBox.appendChild(row);
   chatBox.scrollTop = chatBox.scrollHeight;
+  return row;
+}
+
+function appendUploadingDocument(fileName) {
+  const row = document.createElement("div");
+  row.className = "document-row";
+
+  const extension = (fileName.split(".").pop() || "DOC").slice(0, 4).toUpperCase();
+  row.innerHTML = `
+    <div class="document-chip document-chip-uploading">
+      <div class="document-chip-badge">${escapeHtml(extension)}</div>
+      <div class="document-chip-copy">
+        <p class="document-chip-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</p>
+        <p class="document-chip-subtitle">Uploading document...</p>
+      </div>
+      <div class="document-loader" aria-label="Uploading document">
+        <span class="document-loader-dot"></span>
+        <span class="document-loader-dot"></span>
+        <span class="document-loader-dot"></span>
+      </div>
+    </div>
+  `;
+
+  if (emptyState && emptyState.parentNode === chatBox) {
+    emptyState.remove();
+  }
+
+  chatLayout.classList.remove("new-chat-mode");
+  chatBox.appendChild(row);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  return row;
 }
 
 function appendMessage(role, content, options = {}) {
@@ -467,6 +498,7 @@ async function uploadSelectedFile() {
 
   console.log("[UPLOAD] currentChatId before upload:", state.activeChatId, "filename:", file.name);
   uploadStatus.textContent = `Uploading ${file.name}...`;
+  const uploadingNode = appendUploadingDocument(file.name);
 
   const formData = new FormData();
   formData.append("file", file);
@@ -482,11 +514,14 @@ async function uploadSelectedFile() {
     const data = await parseResponseBody(response);
     if (!response.ok) {
       console.error("[UPLOAD_RESPONSE_ERROR]", data);
+      uploadingNode.remove();
+      updateChatView(activeChat);
       uploadStatus.textContent = data.detail || "Upload failed.";
       return;
     }
 
     console.log("[UPLOAD] backend response chat_id:", data.chat_id, "filename:", data.filename);
+    uploadingNode.remove();
     uploadStatus.textContent = `${data.filename} uploaded successfully. Indexed ${data.chunks_indexed} chunks.`;
     activeChat.documents = activeChat.documents || [];
     activeChat.documents.push(data.document);
@@ -495,6 +530,8 @@ async function uploadSelectedFile() {
     updateChatView(activeChat);
   } catch (error) {
     console.error("[UPLOAD_REQUEST_FAILED]", error);
+    uploadingNode.remove();
+    updateChatView(activeChat);
     uploadStatus.textContent = "Upload failed. Check the backend server.";
   } finally {
     fileInput.value = "";
