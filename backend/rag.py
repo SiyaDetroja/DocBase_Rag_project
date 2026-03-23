@@ -16,6 +16,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# 🔥 ADD THIS GLOBAL CACHE
+VECTORSTORE_CACHE = {}
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -65,10 +67,14 @@ def _load_documents_from_bytes(filename: str, file_bytes: bytes):
 
 def process_file(user_id: int, chat_id: int, filename: str, file_bytes: bytes, source_name: str) -> int:
     docs = _load_documents_from_bytes(filename, file_bytes)
+    
+    import gc
+    gc.collect()
 
     # Split large files into overlapping chunks so retrieval has focused context.
-    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=50)
     chunks = splitter.split_documents(docs)
+    chunks = chunks[:300] 
 
     for chunk in chunks:
         chunk.metadata["user_id"] = user_id
@@ -94,16 +100,25 @@ def process_file(user_id: int, chat_id: int, filename: str, file_bytes: bytes, s
 
 
 def _get_vectorstore(user_id: int, chat_id: int):
+    key = f"{user_id}_{chat_id}"
+
+    # ✅ return from cache if already loaded
+    if key in VECTORSTORE_CACHE:
+        return VECTORSTORE_CACHE[key]
+
     index_path = get_chat_index_path(user_id, chat_id)
     if not index_path.exists():
         return None
 
-    return FAISS.load_local(
+    vs = FAISS.load_local(
         str(index_path),
         embeddings,
         allow_dangerous_deserialization=True,
     )
 
+    # ✅ store in cache
+    VECTORSTORE_CACHE[key] = vs
+    return vs
 
 def _build_llm():
     groq_api_key = os.getenv("GROQ_API_KEY")
