@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Iterable
 
 from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader, TextLoader
-from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from dotenv import load_dotenv
@@ -96,7 +95,7 @@ def process_file(user_id: int, chat_id: int, filename: str, file_bytes: bytes, s
         # Each user has an isolated FAISS folder, so their embeddings never mix.
         vectorstore = FAISS.load_local(
             str(index_path),
-            embeddings,
+            get_embeddings(),
             allow_dangerous_deserialization=True,
         )
         vectorstore.add_documents(chunks)
@@ -249,8 +248,16 @@ def get_answer(user_id: int, chat_id: int, query: str, history: Iterable[dict]):
         HumanMessage(content=query),
     ]
 
-    llm = _build_llm()
-    response = llm.invoke(llm_messages)
+    _llm = None
+
+    def get_llm():
+        global _llm
+        if _llm is None:
+            print("🚀 Loading LLM...")
+            _llm = _build_llm()
+        return _llm
+
+    response = get_llm().invoke(llm_messages)
 
     sources = []
     for doc in retrieved_docs:
