@@ -24,7 +24,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 FAISS_ROOT = BASE_DIR / "faiss_indexes"
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
-embeddings = FastEmbedEmbeddings()
+_embeddings = None
+
+def get_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        print(" Loading model...")
+        from langchain_community.embeddings import FastEmbedEmbeddings
+        _embeddings = FastEmbedEmbeddings()
+    return _embeddings
 STOPWORDS = {
     "what", "is", "the", "a", "an", "of", "for", "to", "in", "on", "about",
     "tell", "me", "please", "explain", "define", "give", "with", "and",
@@ -93,7 +101,7 @@ def process_file(user_id: int, chat_id: int, filename: str, file_bytes: bytes, s
         )
         vectorstore.add_documents(chunks)
     else:
-        vectorstore = FAISS.from_documents(chunks, embeddings)
+        vectorstore = FAISS.from_documents(chunks, get_embeddings())
 
     vectorstore.save_local(str(index_path))
     return len(chunks)
@@ -112,7 +120,7 @@ def _get_vectorstore(user_id: int, chat_id: int):
 
     vs = FAISS.load_local(
         str(index_path),
-        embeddings,
+        get_embeddings(),
         allow_dangerous_deserialization=True,
     )
 
