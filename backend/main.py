@@ -32,7 +32,7 @@ app = FastAPI(title="RAG Web App")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "*"
+        "*",
         "https://docbaseragapp.vercel.app",
         
     ],
