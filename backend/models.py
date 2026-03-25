@@ -1,5 +1,6 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text, func ,UniqueConstraint
 from sqlalchemy.orm import relationship
+from .database import Base   # adjust import to match your project layout
 
 try:
     from .database import Base
@@ -73,3 +74,20 @@ class UploadedDocument(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     chat = relationship("Chat", back_populates="documents")
+ 
+class ChatFaissIndex(Base):
+    __tablename__ = "chat_faiss_index"
+ 
+    id       = Column(Integer, primary_key=True, index=True)
+    user_id  = Column(Integer, nullable=False, index=True)
+    chat_id  = Column(Integer, nullable=False, index=True)
+    index_data = Column(LargeBinary, nullable=False)   # zipped FAISS files
+ 
+    __table_args__ = (
+        UniqueConstraint("user_id", "chat_id", name="uq_user_chat_faiss"),
+    )
+ 
+
+
+
+
