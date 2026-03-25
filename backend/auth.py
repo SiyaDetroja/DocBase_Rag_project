@@ -48,9 +48,16 @@ def decode_access_token(token: str) -> int:
             detail="Invalid or expired token",
         ) from exc
 
+from fastapi import Request
+
 def get_current_user_id(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> int:
+    # ✅ Skip auth for OPTIONS (preflight)
+    if request.method == "OPTIONS":
+        return 0
+
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -58,22 +65,14 @@ def get_current_user_id(
         )
 
     try:
-        user_id = decode_access_token(credentials.credentials)
+        return decode_access_token(credentials.credentials)
 
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
-            )
-
-        return user_id
-
-    except HTTPException as e:
-     raise e  # clearer
+    except HTTPException:
+        raise
 
     except Exception as e:
-     print("🔥 AUTH ERROR:", str(e))  # debug log
-     raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid or expired token",
-    )
+        print("🔥 AUTH ERROR:", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
