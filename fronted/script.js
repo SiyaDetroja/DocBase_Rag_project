@@ -1,7 +1,6 @@
 const API = "https://docbase-hhxp.onrender.com";
 
-const token = localStorage.getItem("token");
-if (!token) {
+if (!localStorage.getItem("token")) {
   window.location.href = "login.html";
 }
 
@@ -31,9 +30,13 @@ let historyRetryTimer = null;
 let pendingDeleteChatId = null;
 
 function getAuthHeaders(json = true) {
-  const headers = {
-    Authorization: `Bearer ${token}`
-  };
+  const token = localStorage.getItem("token"); // ✅ ALWAYS fresh
+
+  const headers = {};
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   if (json) {
     headers["Content-Type"] = "application/json";
@@ -327,7 +330,7 @@ async function createEmptyChat() {
 
 async function fetchHistory() {
   const response = await fetch(`${API}/history`, {
-    headers: getAuthHeaders(false)
+    headers: getAuthHeaders()
   });
 
   if (response.status === 401) {
