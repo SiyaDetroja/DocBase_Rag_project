@@ -19,10 +19,6 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 
-
-
-
-
 def hash_password(password: str):
     # Convert to fixed length (VERY IMPORTANT)
     password = hashlib.sha256(password.encode()).hexdigest()
@@ -52,7 +48,6 @@ def decode_access_token(token: str) -> int:
             detail="Invalid or expired token",
         ) from exc
 
-
 def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> int:
@@ -62,4 +57,23 @@ def get_current_user_id(
             detail="Authentication required",
         )
 
-    return decode_access_token(credentials.credentials)
+    try:
+        user_id = decode_access_token(credentials.credentials)
+
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+            )
+
+        return user_id
+
+    except HTTPException as e:
+     raise e  # clearer
+
+    except Exception as e:
+     print("🔥 AUTH ERROR:", str(e))  # debug log
+     raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired token",
+    )
