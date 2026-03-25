@@ -2,11 +2,10 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import hashlib
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from dotenv import load_dotenv
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from passlib.context import CryptContext
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -16,20 +15,23 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-in-production")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+
+# ✅ FIXED: was 60 minutes — users were getting logged out mid-session.
+# Now 7 days. Change via ACCESS_TOKEN_EXPIRE_MINUTES env var if needed.
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
 
 
-def hash_password(password: str):
-    # Convert to fixed length (VERY IMPORTANT)
+def hash_password(password: str) -> str:
     password = hashlib.sha256(password.encode()).hexdigest()
     return pwd_context.hash(password)
 
-def verify_password(plain_password, hashed_password):
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     plain_password = hashlib.sha256(plain_password.encode()).hexdigest()
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def create_access_token(user_id: int) -> str:
-    # The JWT stores the user id in `sub`, which protected routes read later.
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": str(user_id), "exp": expires_at}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -48,13 +50,11 @@ def decode_access_token(token: str) -> int:
             detail="Invalid or expired token",
         ) from exc
 
-from fastapi import Request
 
 def get_current_user_id(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> int:
-    # ✅ Skip auth for OPTIONS (preflight)
     if request.method == "OPTIONS":
         return 0
 
@@ -66,12 +66,10 @@ def get_current_user_id(
 
     try:
         return decode_access_token(credentials.credentials)
-
     except HTTPException:
         raise
-
     except Exception as e:
-        print("🔥 AUTH ERROR:", str(e))
+        print(f"[AUTH ERROR] {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",

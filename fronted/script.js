@@ -29,45 +29,70 @@ const sidebarBackdrop = document.getElementById("sidebarBackdrop");
 let historyRetryTimer = null;
 let pendingDeleteChatId = null;
 
+// ─────────────────────────────────────────────────────────────
+// Keep Render free tier awake — ping every 10 minutes
+// ─────────────────────────────────────────────────────────────
+setInterval(() => {
+  fetch(`${API}/`).catch(() => {});
+}, 10 * 60 * 1000);
+
+// ─────────────────────────────────────────────────────────────
+// Token helpers
+// ─────────────────────────────────────────────────────────────
 function getAuthHeaders(json = true) {
-  const token = localStorage.getItem("token"); // ✅ ALWAYS fresh
-
+  const token = localStorage.getItem("token");
   const headers = {};
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  if (json) {
-    headers["Content-Type"] = "application/json";
-  }
-
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (json) headers["Content-Type"] = "application/json";
   return headers;
 }
 
+/**
+ * Check if the stored JWT is expired BEFORE sending a request.
+ * JWT payload is base64url — we just decode the middle part.
+ */
+function isTokenExpired() {
+  const token = localStorage.getItem("token");
+  if (!token) return true;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    // exp is in seconds — compare to current time
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
+function handleExpiredToken() {
+  showBanner("Your session has expired. Please log in again.");
+  setTimeout(() => {
+    logout();
+  }, 2000);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Response parser
+// ─────────────────────────────────────────────────────────────
 async function parseResponseBody(response) {
   const text = await response.text();
-  if (!text) {
-    return {};
-  }
-
+  if (!text) return {};
   try {
     return JSON.parse(text);
-  } catch (error) {
+  } catch {
     return { detail: text };
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// UI helpers
+// ─────────────────────────────────────────────────────────────
 function autoResizeTextarea() {
   messageInput.style.height = "auto";
   messageInput.style.height = `${Math.min(messageInput.scrollHeight, 180)}px`;
 }
 
 function formatTime(value) {
-  if (!value) {
-    return "";
-  }
-
+  if (!value) return "";
   return new Date(value).toLocaleString();
 }
 
@@ -78,14 +103,27 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;");
 }
 
+function showBanner(message) {
+  const banner = document.createElement("div");
+  banner.className = "system-banner";
+  banner.textContent = message;
+  chatBox.appendChild(banner);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function clearSystemBanners() {
+  chatBox.querySelectorAll(".system-banner").forEach((b) => b.remove());
+}
+
+// ─────────────────────────────────────────────────────────────
+// Chat list rendering
+// ─────────────────────────────────────────────────────────────
 function renderChats() {
   chatList.innerHTML = "";
-
   if (!state.chats.length) {
     chatList.innerHTML = '<div class="chat-item empty-chat-item"><h3>New chats will appear here</h3></div>';
     return;
   }
-
   state.chats.forEach((chat) => {
     const item = document.createElement("div");
     const title = (chat.title || "New Chat").trim();
@@ -96,78 +134,61 @@ function renderChats() {
         <button class="delete-btn" type="button" data-chat-id="${chat.id}">Delete</button>
       </div>
     `;
-
-    item.addEventListener("click", (event) => {
-      if (event.target.classList.contains("delete-btn")) {
-        return;
-      }
+    item.addEventListener("click", (e) => {
+      if (e.target.classList.contains("delete-btn")) return;
       openChat(chat.id);
     });
-
-    const deleteBtn = item.querySelector(".delete-btn");
-    deleteBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
+    item.querySelector(".delete-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
       openDeleteModal(chat.id);
     });
-
     chatList.appendChild(item);
   });
 }
 
 function getActiveChat() {
-  return state.chats.find((chat) => chat.id === state.activeChatId) || null;
+  return state.chats.find((c) => c.id === state.activeChatId) || null;
 }
 
 function ensureChatShape(chat) {
-  if (!chat.documents) {
-    chat.documents = [];
-  }
-  if (!chat.messages) {
-    chat.messages = [];
-  }
+  if (!chat.documents) chat.documents = [];
+  if (!chat.messages) chat.messages = [];
   return chat;
 }
 
+// ─────────────────────────────────────────────────────────────
+// Message / document rendering
+// ─────────────────────────────────────────────────────────────
 function renderMessages(chat) {
   chatBox.innerHTML = "";
-
   if (!chat || !chat.messages.length) {
     if (chat && chat.documents && chat.documents.length) {
-      chat.documents.forEach((document) => appendDocument(document));
+      chat.documents.forEach(appendDocument);
     } else if (emptyState) {
       chatBox.appendChild(emptyState);
     }
     return;
   }
-
   if (chat.documents && chat.documents.length) {
-    chat.documents.forEach((document) => appendDocument(document));
+    chat.documents.forEach(appendDocument);
   }
-
-  chat.messages.forEach((message) => {
-    appendMessage(message.role, message.content, {
-      timestamp: message.timestamp
-    });
-  });
-
+  chat.messages.forEach((m) => appendMessage(m.role, m.content, { timestamp: m.timestamp }));
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 function appendDocument(uploadedDoc) {
   const row = document.createElement("div");
   row.className = "document-row";
-
-  const extension = (uploadedDoc.name.split(".").pop() || "DOC").slice(0, 4).toUpperCase();
+  const ext = (uploadedDoc.name.split(".").pop() || "DOC").slice(0, 4).toUpperCase();
   row.innerHTML = `
     <div class="document-chip">
-      <div class="document-chip-badge">${escapeHtml(extension)}</div>
+      <div class="document-chip-badge">${escapeHtml(ext)}</div>
       <div class="document-chip-copy">
         <p class="document-chip-title" title="${escapeHtml(uploadedDoc.name)}">${escapeHtml(uploadedDoc.name)}</p>
-        <p class="document-chip-subtitle">${escapeHtml(`Uploaded: ${uploadedDoc.name}`)}</p>
+        <p class="document-chip-subtitle">Uploaded: ${escapeHtml(uploadedDoc.name)}</p>
       </div>
     </div>
   `;
-
   chatBox.appendChild(row);
   chatBox.scrollTop = chatBox.scrollHeight;
   return row;
@@ -176,13 +197,12 @@ function appendDocument(uploadedDoc) {
 function appendUploadingDocument(fileName) {
   const row = document.createElement("div");
   row.className = "document-row";
-
-  const extension = (fileName.split(".").pop() || "DOC").slice(0, 4).toUpperCase();
+  const ext = (fileName.split(".").pop() || "DOC").slice(0, 4).toUpperCase();
   row.innerHTML = `
     <div class="document-chip document-chip-uploading">
-      <div class="document-chip-badge">${escapeHtml(extension)}</div>
+      <div class="document-chip-badge">${escapeHtml(ext)}</div>
       <div class="document-chip-copy">
-        <p class="document-chip-title" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</p>
+        <p class="document-chip-title">${escapeHtml(fileName)}</p>
         <p class="document-chip-subtitle">Uploading document...</p>
       </div>
       <div class="document-loader" aria-label="Uploading document">
@@ -192,11 +212,7 @@ function appendUploadingDocument(fileName) {
       </div>
     </div>
   `;
-
-  if (emptyState && emptyState.parentNode === chatBox) {
-    emptyState.remove();
-  }
-
+  if (emptyState && emptyState.parentNode === chatBox) emptyState.remove();
   chatLayout.classList.remove("new-chat-mode");
   chatBox.appendChild(row);
   chatBox.scrollTop = chatBox.scrollHeight;
@@ -206,7 +222,6 @@ function appendUploadingDocument(fileName) {
 function appendMessage(role, content, options = {}) {
   const row = document.createElement("div");
   row.className = `message-row ${role}`;
-
   const bubble = document.createElement("div");
   bubble.className = `message-bubble${role === "assistant" ? " message-content" : ""}`;
   bubble.innerHTML = escapeHtml(content);
@@ -226,7 +241,6 @@ function appendMessage(role, content, options = {}) {
     meta.className = "message-meta";
     meta.textContent = options.timestamp ? formatTime(options.timestamp) : "";
     bubble.appendChild(meta);
-
     if (options.sources && options.sources.length) {
       const sources = document.createElement("div");
       sources.className = "sources";
@@ -241,18 +255,9 @@ function appendMessage(role, content, options = {}) {
   return row;
 }
 
-function showBanner(message) {
-  const banner = document.createElement("div");
-  banner.className = "system-banner";
-  banner.textContent = message;
-  chatBox.appendChild(banner);
-  chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-function clearSystemBanners() {
-  chatBox.querySelectorAll(".system-banner").forEach((banner) => banner.remove());
-}
-
+// ─────────────────────────────────────────────────────────────
+// Delete modal
+// ─────────────────────────────────────────────────────────────
 function openDeleteModal(chatId) {
   pendingDeleteChatId = chatId;
   deleteModal.classList.remove("hidden");
@@ -263,48 +268,57 @@ function closeDeleteModal() {
   deleteModal.classList.add("hidden");
 }
 
-function syncUserBadge() {
-  const storedUser = localStorage.getItem("user");
-  if (!storedUser) {
-    return;
-  }
+// ─────────────────────────────────────────────────────────────
+// Sidebar (mobile)
+// ─────────────────────────────────────────────────────────────
+function openSidebar() { document.body.classList.add("mobile-sidebar-open"); }
+function closeSidebar() { document.body.classList.remove("mobile-sidebar-open"); }
+function syncSidebarState() { if (window.innerWidth > 980) closeSidebar(); }
 
+// ─────────────────────────────────────────────────────────────
+// User badge
+// ─────────────────────────────────────────────────────────────
+function syncUserBadge() {
+  const stored = localStorage.getItem("user");
+  if (!stored) return;
   try {
-    const user = JSON.parse(storedUser);
+    const user = JSON.parse(stored);
     userBadge.textContent = user.username || user.email || "Authenticated";
-  } catch (error) {
+  } catch {
     userBadge.textContent = "Authenticated";
   }
 }
 
-function clearChatSessionState() {
-  sessionStorage.removeItem("activeChatId");
-}
-
-function openSidebar() {
-  document.body.classList.add("mobile-sidebar-open");
-}
-
-function closeSidebar() {
-  document.body.classList.remove("mobile-sidebar-open");
-}
-
-function syncSidebarState() {
-  if (window.innerWidth > 980) {
-    closeSidebar();
-  }
-}
+// ─────────────────────────────────────────────────────────────
+// Session state
+// ─────────────────────────────────────────────────────────────
+function clearChatSessionState() { sessionStorage.removeItem("activeChatId"); }
 
 function restoreActiveChatState() {
-  const savedChatId = sessionStorage.getItem("activeChatId");
-  if (!savedChatId) {
-    return;
-  }
+  const saved = sessionStorage.getItem("activeChatId");
+  if (!saved) return;
+  const id = Number(saved);
+  if (!Number.isNaN(id) && id > 0) state.activeChatId = id;
+}
 
-  const parsedId = Number(savedChatId);
-  if (!Number.isNaN(parsedId) && parsedId > 0) {
-    state.activeChatId = parsedId;
-  }
+// ─────────────────────────────────────────────────────────────
+// Chat operations
+// ─────────────────────────────────────────────────────────────
+function updateChatView(chat) {
+  chatTitle.textContent = chat ? chat.title : "New Chat";
+  const hasContent = Boolean(
+    chat && ((chat.messages && chat.messages.length) || (chat.documents && chat.documents.length))
+  );
+  chatLayout.classList.toggle("new-chat-mode", !hasContent);
+  renderMessages(chat);
+}
+
+function openChat(chatId) {
+  state.activeChatId = chatId;
+  sessionStorage.setItem("activeChatId", String(chatId));
+  renderChats();
+  updateChatView(getActiveChat());
+  if (window.innerWidth <= 980) closeSidebar();
 }
 
 async function createEmptyChat() {
@@ -313,12 +327,8 @@ async function createEmptyChat() {
     headers: getAuthHeaders(true),
     body: JSON.stringify({ title: "New Chat" })
   });
-
   const data = await parseResponseBody(response);
-  if (!response.ok) {
-    throw new Error(data.detail || "Could not create chat.");
-  }
-
+  if (!response.ok) throw new Error(data.detail || "Could not create chat.");
   const chat = ensureChatShape(data.chat);
   state.activeChatId = chat.id;
   sessionStorage.setItem("activeChatId", String(chat.id));
@@ -329,73 +339,49 @@ async function createEmptyChat() {
 }
 
 async function fetchHistory() {
-  const response = await fetch(`${API}/history`, {
-    headers: getAuthHeaders()
-  });
-
-  if (response.status === 401) {
-    logout();
-    return;
-  }
-
+  const response = await fetch(`${API}/history`, { headers: getAuthHeaders() });
+  if (response.status === 401) { logout(); return; }
   const data = await parseResponseBody(response);
-  state.chats = (data.chats || []).map((chat) => ensureChatShape(chat));
+  state.chats = (data.chats || []).map(ensureChatShape);
   clearSystemBanners();
-
-  if (state.activeChatId) {
-    const stillExists = state.chats.some((chat) => chat.id === state.activeChatId);
-    if (!stillExists) {
-      state.activeChatId = null;
-      clearChatSessionState();
-    }
+  if (state.activeChatId && !state.chats.some((c) => c.id === state.activeChatId)) {
+    state.activeChatId = null;
+    clearChatSessionState();
   }
-
   if (!state.activeChatId && state.chats.length) {
     state.activeChatId = state.chats[0].id;
     sessionStorage.setItem("activeChatId", String(state.activeChatId));
   }
-
   renderChats();
-  const activeChat = getActiveChat();
-  updateChatView(activeChat || null);
-}
-
-function updateChatView(chat) {
-  chatTitle.textContent = chat ? chat.title : "New Chat";
-  const hasContent = Boolean(chat && ((chat.messages && chat.messages.length) || (chat.documents && chat.documents.length)));
-  chatLayout.classList.toggle("new-chat-mode", !hasContent);
-  renderMessages(chat);
-}
-
-function openChat(chatId) {
-  state.activeChatId = chatId;
-  sessionStorage.setItem("activeChatId", String(chatId));
-  renderChats();
-  const chat = getActiveChat();
-  updateChatView(chat);
-  if (window.innerWidth <= 980) {
-    closeSidebar();
-  }
+  updateChatView(getActiveChat() || null);
 }
 
 async function newChat() {
   try {
     await createEmptyChat();
-  } catch (error) {
-    showBanner(error.message || "Could not create a new chat.");
+  } catch (e) {
+    showBanner(e.message || "Could not create a new chat.");
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// sendMessage — fully fixed
+// ─────────────────────────────────────────────────────────────
 async function sendMessage() {
   const message = messageInput.value.trim();
-  if (!message || state.loading) {
+  if (!message || state.loading) return;
+
+  // ✅ Check token expiry BEFORE sending — avoids the fake CORS error
+  if (isTokenExpired()) {
+    handleExpiredToken();
     return;
   }
 
+  const sendBtn = document.getElementById("sendBtn");
+  sendBtn.disabled = true;
   state.loading = true;
-  if (emptyState && emptyState.parentNode === chatBox) {
-    emptyState.remove();
-  }
+
+  if (emptyState && emptyState.parentNode === chatBox) emptyState.remove();
 
   appendMessage("user", message, { timestamp: new Date().toISOString() });
   messageInput.value = "";
@@ -407,24 +393,27 @@ async function sendMessage() {
     const response = await fetch(`${API}/chat`, {
       method: "POST",
       headers: getAuthHeaders(true),
-      body: JSON.stringify({
-        message,
-        chat_id: state.activeChatId
-      })
+      body: JSON.stringify({ message, chat_id: state.activeChatId })
     });
 
     const data = await parseResponseBody(response);
-    typingNode.remove();
+    typingNode.remove(); // ✅ always removed after response
+
+    // ✅ Handle 401 (expired token) properly instead of showing CORS error
+    if (response.status === 401) {
+      handleExpiredToken();
+      return;
+    }
 
     if (!response.ok) {
-      console.error("[CHAT_RESPONSE_ERROR]", data);
-      showBanner(data.detail || "Request failed.");
+      showBanner(data.detail || "Request failed. Please try again.");
       return;
     }
 
     state.activeChatId = data.chat_id;
     sessionStorage.setItem("activeChatId", String(data.chat_id));
-    const existingIndex = state.chats.findIndex((chat) => chat.id === data.chat_id);
+
+    const existingIndex = state.chats.findIndex((c) => c.id === data.chat_id);
     const existingChat = existingIndex >= 0 ? state.chats[existingIndex] : null;
     const updatedChat = ensureChatShape({
       id: data.chat_id,
@@ -444,6 +433,7 @@ async function sendMessage() {
     renderChats();
     updateChatView(updatedChat);
 
+    // Append sources to last assistant bubble
     const rows = Array.from(chatBox.querySelectorAll(".message-row.assistant"));
     const lastRow = rows[rows.length - 1];
     if (lastRow && data.sources && data.sources.length) {
@@ -455,27 +445,41 @@ async function sendMessage() {
         bubble.appendChild(sources);
       }
     }
+
   } catch (error) {
+    // ✅ typingNode is already removed above on success path;
+    //    on network error it may still be in DOM — remove safely
+    if (typingNode.parentNode) typingNode.remove();
+
+    // Distinguish network failure from token expiry
+    if (isTokenExpired()) {
+      handleExpiredToken();
+    } else {
+      showBanner("Chat request failed. Please check your connection and try again.");
+    }
     console.error("[CHAT_REQUEST_FAILED]", error);
-    typingNode.remove();
-    showBanner(`Chat request failed: ${error.message}`);
   } finally {
+    // ✅ ALWAYS re-enable the button — success, error, or 401
     state.loading = false;
+    sendBtn.disabled = false;
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// File upload
+// ─────────────────────────────────────────────────────────────
 async function uploadSelectedFile() {
   const file = fileInput.files[0];
-  if (!file) {
-    return;
-  }
+  if (!file) return;
+
+  if (isTokenExpired()) { handleExpiredToken(); return; }
 
   let activeChat = getActiveChat();
   if (!state.activeChatId) {
     try {
       activeChat = await createEmptyChat();
-    } catch (error) {
-      uploadStatus.textContent = error.message || "Could not create a chat for upload.";
+    } catch (e) {
+      uploadStatus.textContent = e.message || "Could not create a chat for upload.";
       fileInput.value = "";
       return;
     }
@@ -490,19 +494,13 @@ async function uploadSelectedFile() {
       documents: [],
       messages: []
     });
-
-    const existingIndex = state.chats.findIndex((chat) => chat.id === activeChat.id);
-    if (existingIndex >= 0) {
-      state.chats[existingIndex] = activeChat;
-    } else {
-      state.chats.unshift(activeChat);
-    }
+    const idx = state.chats.findIndex((c) => c.id === activeChat.id);
+    if (idx >= 0) state.chats[idx] = activeChat;
+    else state.chats.unshift(activeChat);
   }
 
-  console.log("[UPLOAD] currentChatId before upload:", state.activeChatId, "filename:", file.name);
   uploadStatus.textContent = `Uploading ${file.name}...`;
   const uploadingNode = appendUploadingDocument(file.name);
-
   const formData = new FormData();
   formData.append("file", file);
   formData.append("chat_id", String(state.activeChatId));
@@ -513,62 +511,63 @@ async function uploadSelectedFile() {
       headers: getAuthHeaders(false),
       body: formData
     });
-
     const data = await parseResponseBody(response);
+
+    if (response.status === 401) { handleExpiredToken(); return; }
+
     if (!response.ok) {
-      console.error("[UPLOAD_RESPONSE_ERROR]", data);
       uploadingNode.remove();
       updateChatView(activeChat);
       uploadStatus.textContent = data.detail || "Upload failed.";
       return;
     }
 
-    console.log("[UPLOAD] backend response chat_id:", data.chat_id, "filename:", data.filename);
     uploadingNode.remove();
-    uploadStatus.textContent = `${data.filename} uploaded successfully. Indexed ${data.chunks_indexed} chunks.`;
+    uploadStatus.textContent = `${data.filename} uploaded. Indexed ${data.chunks_indexed} chunks.`;
     activeChat.documents = activeChat.documents || [];
     activeChat.documents.push(data.document);
     activeChat.updated_at = new Date().toISOString();
     renderChats();
     updateChatView(activeChat);
-  } catch (error) {
-    console.error("[UPLOAD_REQUEST_FAILED]", error);
+  } catch (e) {
     uploadingNode.remove();
     updateChatView(activeChat);
-    uploadStatus.textContent = "Upload failed. Check the backend server.";
+    uploadStatus.textContent = "Upload failed. Check your connection.";
+    console.error("[UPLOAD_REQUEST_FAILED]", e);
   } finally {
     fileInput.value = "";
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Delete chat
+// ─────────────────────────────────────────────────────────────
 async function deleteChat(chatId) {
   const response = await fetch(`${API}/chats/${chatId}`, {
     method: "DELETE",
     headers: getAuthHeaders(false)
   });
-
   if (!response.ok) {
     const data = await parseResponseBody(response);
     alert(data.detail || "Could not delete chat.");
     return;
   }
-
   if (state.activeChatId === chatId) {
     state.activeChatId = null;
     clearChatSessionState();
   }
-
-  state.chats = state.chats.filter((chat) => chat.id !== chatId);
-
+  state.chats = state.chats.filter((c) => c.id !== chatId);
   if (!state.activeChatId && state.chats.length) {
     state.activeChatId = state.chats[0].id;
     sessionStorage.setItem("activeChatId", String(state.activeChatId));
   }
-
   renderChats();
   updateChatView(getActiveChat() || null);
 }
 
+// ─────────────────────────────────────────────────────────────
+// Logout
+// ─────────────────────────────────────────────────────────────
 function logout() {
   clearChatSessionState();
   localStorage.removeItem("token");
@@ -576,59 +575,47 @@ function logout() {
   window.location.href = "login.html";
 }
 
+// ─────────────────────────────────────────────────────────────
+// Event listeners
+// ─────────────────────────────────────────────────────────────
 document.getElementById("sendBtn").addEventListener("click", sendMessage);
 document.getElementById("newChatBtn").addEventListener("click", newChat);
 document.getElementById("logoutBtn").addEventListener("click", logout);
 document.getElementById("composerUploadBtn").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", uploadSelectedFile);
-if (mobileMenuBtn) {
-  mobileMenuBtn.addEventListener("click", openSidebar);
-}
-if (sidebarCloseBtn) {
-  sidebarCloseBtn.addEventListener("click", closeSidebar);
-}
-if (sidebarBackdrop) {
-  sidebarBackdrop.addEventListener("click", closeSidebar);
-}
-confirmDeleteBtn.addEventListener("click", async () => {
-  if (pendingDeleteChatId == null) {
-    closeDeleteModal();
-    return;
-  }
+if (mobileMenuBtn) mobileMenuBtn.addEventListener("click", openSidebar);
+if (sidebarCloseBtn) sidebarCloseBtn.addEventListener("click", closeSidebar);
+if (sidebarBackdrop) sidebarBackdrop.addEventListener("click", closeSidebar);
 
+confirmDeleteBtn.addEventListener("click", async () => {
+  if (pendingDeleteChatId == null) { closeDeleteModal(); return; }
   const chatId = pendingDeleteChatId;
   closeDeleteModal();
   await deleteChat(chatId);
 });
 cancelDeleteBtn.addEventListener("click", closeDeleteModal);
-deleteModal.addEventListener("click", (event) => {
-  if (event.target === deleteModal) {
-    closeDeleteModal();
-  }
-});
-quickActions.querySelectorAll(".quick-action-btn").forEach((button) => {
-  button.addEventListener("click", () => {
-    messageInput.value = button.dataset.prompt || "";
+deleteModal.addEventListener("click", (e) => { if (e.target === deleteModal) closeDeleteModal(); });
+
+quickActions.querySelectorAll(".quick-action-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    messageInput.value = btn.dataset.prompt || "";
     autoResizeTextarea();
     messageInput.focus();
   });
 });
 
 messageInput.addEventListener("input", autoResizeTextarea);
-messageInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    sendMessage();
-  }
+messageInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 window.addEventListener("resize", syncSidebarState);
-window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closeSidebar();
-    closeDeleteModal();
-  }
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closeSidebar(); closeDeleteModal(); }
 });
 
+// ─────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────
 syncUserBadge();
 autoResizeTextarea();
 restoreActiveChatState();
@@ -637,7 +624,5 @@ fetchHistory().catch(() => {
   clearSystemBanners();
   showBanner("Backend is restarting or temporarily unavailable. Retrying...");
   clearTimeout(historyRetryTimer);
-  historyRetryTimer = setTimeout(() => {
-    fetchHistory().catch(() => { });
-  }, 1500);
+  historyRetryTimer = setTimeout(() => { fetchHistory().catch(() => {}); }, 1500);
 });
