@@ -340,20 +340,48 @@ async function createEmptyChat() {
 
 async function fetchHistory() {
   const response = await fetch(`${API}/history`, { headers: getAuthHeaders() });
+
   if (response.status === 401) { logout(); return; }
+
+  // ✅ Handle 502/503 (Render waking up) as a retryable error
+  if (!response.ok) {
+    throw new Error(`Server returned ${response.status}`);
+  }
+
   const data = await parseResponseBody(response);
   state.chats = (data.chats || []).map(ensureChatShape);
   clearSystemBanners();
+
   if (state.activeChatId && !state.chats.some((c) => c.id === state.activeChatId)) {
     state.activeChatId = null;
     clearChatSessionState();
   }
+
   if (!state.activeChatId && state.chats.length) {
     state.activeChatId = state.chats[0].id;
     sessionStorage.setItem("activeChatId", String(state.activeChatId));
   }
+
   renderChats();
   updateChatView(getActiveChat() || null);
+}
+
+// ✅ Retries up to 5 times with exponential backoff
+// Attempt 1 → wait 1.5s → Attempt 2 → wait 3s → Attempt 3 → wait 6s...
+async function fetchHistoryWithRetry(attempt = 1) {
+  try {
+    await fetchHistory();
+  } catch {
+    if (attempt >= 5) {
+      clearSystemBanners();
+      showBanner("Backend unavailable. Please refresh the page.");
+      return;
+    }
+    const delay = 1500 * Math.pow(2, attempt - 1);
+    clearSystemBanners();
+    showBanner(`Backend is starting up... retrying (${attempt}/5)`);
+    setTimeout(() => fetchHistoryWithRetry(attempt + 1), delay);
+  }
 }
 
 async function newChat() {
@@ -620,9 +648,9 @@ syncUserBadge();
 autoResizeTextarea();
 restoreActiveChatState();
 syncSidebarState();
-fetchHistory().catch(() => {
-  clearSystemBanners();
-  showBanner("Backend is restarting or temporarily unavailable. Retrying...");
-  clearTimeout(historyRetryTimer);
-  historyRetryTimer = setTimeout(() => { fetchHistory().catch(() => {}); }, 1500);
-});
+// ✅ REPLACE WITH THIS
+syncUserBadge();
+autoResizeTextarea();
+restoreActiveChatState();
+syncSidebarState();
+fetchHistoryWithRetry();

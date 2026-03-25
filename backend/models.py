@@ -1,6 +1,5 @@
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, LargeBinary, String, Text, func ,UniqueConstraint
-from sqlalchemy.orm import relationship
-from .database import Base   # adjust import to match your project layout
+from sqlalchemy.orm import relationship  # adjust import to match your project layout
 
 try:
     from .database import Base
