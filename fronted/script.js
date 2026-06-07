@@ -1,4 +1,4 @@
-const API = "https://docbase-hhxp.onrender.com";
+const API = "https://docbase-6owi.onrender.com";
 
 if (!localStorage.getItem("token")) {
   window.location.href = "login.html";
