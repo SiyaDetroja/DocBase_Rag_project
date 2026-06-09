@@ -14,6 +14,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import FastEmbedEmbeddings
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -47,7 +48,7 @@ def get_embeddings():
         with _embeddings_lock:
             if _embeddings is None:           # double-checked locking
                 print("[RAG] Loading embedding model...")
-                from langchain_community.embeddings import FastEmbedEmbeddings
+              
                 _embeddings = FastEmbedEmbeddings()
     return _embeddings
 
@@ -262,8 +263,22 @@ def process_file(
     docs = _load_documents_from_bytes(filename, file_bytes)
     gc.collect()
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=50)
-    chunks = splitter.split_documents(docs)[:300]
+
+    splitter = RecursiveCharacterTextSplitter(
+      chunk_size=1000,
+      chunk_overlap=200
+     )
+
+    chunks = splitter.split_documents(docs)
+    
+    retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 10,
+        "fetch_k": 30
+    }
+)
+
 
     for chunk in chunks:
         chunk.metadata.update(
@@ -369,7 +384,7 @@ def get_answer(user_id: int, chat_id: int, query: str, history: Iterable[dict]) 
             "sources": [],
         }
 
-    scored_docs = vectorstore.similarity_search_with_score(query, k=5)
+    scored_docs = vectorstore.similarity_search_with_score(query, k=15)
     docs = [d for d, _ in scored_docs]
     scores = [s for _, s in scored_docs]
 
