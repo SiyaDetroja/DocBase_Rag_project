@@ -560,7 +560,7 @@ async function uploadSelectedFile() {
   } catch (e) {
     uploadingNode.remove();
     updateChatView(activeChat);
-    uploadStatus.textContent = "Upload failed. Check your connection.";
+    uploadStatus.textContent = "Upload did not finish. The server may have timed out while indexing this document.";
     console.error("[UPLOAD_REQUEST_FAILED]", e);
   } finally {
     fileInput.value = "";

@@ -259,7 +259,7 @@ def upload_file(
         original_name=original_name,
         mime_type=file.content_type,
         file_size=len(file_bytes),
-        file_data=file_bytes,
+        file_data=b"",
     )
     db.add(document)
     db.commit()

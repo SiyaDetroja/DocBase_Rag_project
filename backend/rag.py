@@ -23,6 +23,8 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # ---------------------------------------------------------------------------
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt", ".pptx"}
 INDEX_BATCH_SIZE = int(os.getenv("INDEX_BATCH_SIZE", "64"))
+RETRIEVAL_K = int(os.getenv("RETRIEVAL_K", "8"))
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "12000"))
 
 STOPWORDS = {
     "what", "is", "the", "a", "an", "of", "for", "to", "in", "on", "about",
@@ -385,17 +387,31 @@ def get_answer(user_id: int, chat_id: int, query: str, history: Iterable[dict]) 
             "sources": [],
         }
 
-    scored_docs = vectorstore.similarity_search_with_score(query, k=15)
+    scored_docs = vectorstore.similarity_search_with_score(query, k=RETRIEVAL_K)
     docs = [d for d, _ in scored_docs]
-    scores = [s for _, s in scored_docs]
 
-    context = ""
-    if docs and _is_relevant_match(query, docs, scores):
-        context = "\n\n".join(d.page_content for d in docs)
-
-    if not context:
+    if not docs:
         return {
             "answer": "I could not find a relevant answer for that question in the uploaded document(s) for this chat.",
+            "sources": [],
+        }
+
+    context_parts = []
+    total_chars = 0
+    for doc in docs:
+        content = doc.page_content.strip()
+        if not content:
+            continue
+        remaining = MAX_CONTEXT_CHARS - total_chars
+        if remaining <= 0:
+            break
+        context_parts.append(content[:remaining])
+        total_chars += len(context_parts[-1])
+
+    context = "\n\n".join(context_parts)
+    if not context:
+        return {
+            "answer": "The uploaded document was indexed, but I could not read usable text from the matching pages.",
             "sources": [],
         }
 
