@@ -22,6 +22,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 # Constants
 # ---------------------------------------------------------------------------
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt", ".pptx"}
+INDEX_BATCH_SIZE = int(os.getenv("INDEX_BATCH_SIZE", "64"))
 
 STOPWORDS = {
     "what", "is", "the", "a", "an", "of", "for", "to", "in", "on", "about",
@@ -124,29 +125,29 @@ def _load_index_from_db(user_id: int, chat_id: int) -> bytes | None:
 def _save_index_to_db(user_id: int, chat_id: int, index_bytes: bytes):
     """Upsert FAISS bytes into ChatFaissIndex."""
     try:
-        try:
-            from .models import ChatFaissIndex
-        except ImportError:
-            from models import ChatFaissIndex
+        from .models import ChatFaissIndex
+    except ImportError:
+        from models import ChatFaissIndex
 
-        db = _get_db_session()
-        try:
-            row = db.query(ChatFaissIndex).filter_by(
-                user_id=user_id, chat_id=chat_id
-            ).first()
-            if row:
-                row.index_data = index_bytes
-            else:
-                db.add(ChatFaissIndex(
-                    user_id=user_id,
-                    chat_id=chat_id,
-                    index_data=index_bytes,
-                ))
-            db.commit()
-        finally:
-            db.close()
-    except Exception as exc:
-        print(f"[RAG] _save_index_to_db error: {exc}")
+    db = _get_db_session()
+    try:
+        row = db.query(ChatFaissIndex).filter_by(
+            user_id=user_id, chat_id=chat_id
+        ).first()
+        if row:
+            row.index_data = index_bytes
+        else:
+            db.add(ChatFaissIndex(
+                user_id=user_id,
+                chat_id=chat_id,
+                index_data=index_bytes,
+            ))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def _delete_index_from_db(user_id: int, chat_id: int):
@@ -270,28 +271,28 @@ def process_file(
      )
 
     chunks = splitter.split_documents(docs)
-    
-    retriever = vectorstore.as_retriever(
-    search_type="mmr",
-    search_kwargs={
-        "k": 10,
-        "fetch_k": 30
-    }
-)
-
+    if not chunks:
+        raise ValueError("No readable text was found in this document.")
 
     for chunk in chunks:
         chunk.metadata.update(
             {"user_id": user_id, "chat_id": chat_id, "source": source_name}
         )
 
-    # Build / extend the vectorstore
+    # Build / extend the vectorstore in batches so larger PDFs do not require
+    # embedding every chunk in one memory-heavy call.
     existing_bytes = _load_index_from_db(user_id, chat_id)
     if existing_bytes:
         vs = _bytes_to_vectorstore(existing_bytes)
-        vs.add_documents(chunks)
+        start = 0
     else:
-        vs = FAISS.from_documents(chunks, get_embeddings())
+        first_batch = chunks[:INDEX_BATCH_SIZE]
+        vs = FAISS.from_documents(first_batch, get_embeddings())
+        start = INDEX_BATCH_SIZE
+
+    for index in range(start, len(chunks), INDEX_BATCH_SIZE):
+        vs.add_documents(chunks[index:index + INDEX_BATCH_SIZE])
+        gc.collect()
 
     # Persist to PostgreSQL and refresh cache
     _save_index_to_db(user_id, chat_id, _vectorstore_to_bytes(vs))

@@ -232,10 +232,31 @@ def upload_file(
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
+    original_name = file.filename or f"{uuid4().hex}{suffix}"
+
+    try:
+        # The uploaded document is chunked, embedded, and merged into this chat's own FAISS index
+        # before the document is shown in history. This prevents "uploaded" files with no index.
+        chunk_count = process_file(
+            user_id=user_id,
+            chat_id=chat_row.id,
+            filename=original_name,
+            file_bytes=file_bytes,
+            source_name=original_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        print(f"[UPLOAD] indexing failed: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="The file uploaded, but indexing failed. Please try a smaller PDF or a text-based PDF.",
+        ) from exc
+
     document = UploadedDocument(
         chat_id=chat_row.id,
         user_id=user_id,
-        original_name=file.filename or f"{uuid4().hex}{suffix}",
+        original_name=original_name,
         mime_type=file.content_type,
         file_size=len(file_bytes),
         file_data=file_bytes,
@@ -244,22 +265,13 @@ def upload_file(
     db.commit()
     db.refresh(document)
 
-    # The uploaded document is chunked, embedded, and merged into this chat's own FAISS index.
-    chunk_count = process_file(
-        user_id=user_id,
-        chat_id=chat_row.id,
-        filename=document.original_name,
-        file_bytes=file_bytes,
-        source_name=document.original_name,
-    )
-
     chat_row.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     return {
         "message": "File uploaded",
         "chat_id": chat_row.id,
-        "filename": file.filename,
+        "filename": original_name,
         "chunks_indexed": chunk_count,
         "document": _serialize_document(document),
     }
